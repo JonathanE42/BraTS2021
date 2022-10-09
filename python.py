@@ -1,5 +1,6 @@
 
 
+import tarfile
 import numpy as np
 import nibabel as nib                                                     
 import itk                                                                
@@ -14,14 +15,14 @@ import keras
 import keras.backend as K
 from keras.callbacks import CSVLogger
 import tensorflow as tf
-from tensorflow.keras.utils import plot_model
+from keras.utils import plot_model
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
-from tensorflow.keras.models import *
-from tensorflow.keras.layers import *
-from tensorflow.keras.optimizers import *
-from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, EarlyStopping, TensorBoard
+from keras.models import *
+from keras.layers import *
+from keras.optimizers import *
+from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, EarlyStopping, TensorBoard
 from tensorflow.keras.layers.experimental import preprocessing
 import cv2
 
@@ -129,37 +130,117 @@ def specificity(y_true, y_pred):
     return true_negatives / (possible_negatives + K.epsilon())
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 IMG_SIZE=image_data.shape[0] # 240
 SLICES=image_data.shape[2]-3 # 155 (minus 3 = 152 s.t. we can divide by 2 three times)
 BATCH_SIZE=1
+
+TRAIN_DATASET_PATH = './training-data/'
+
+#file = tarfile.open('./BraTS2021_00621.tar')
+#file.extractall('./val-data')
+#file.close()
+
+
+import os
+train_and_val_directories = [f.path for f in os.scandir(TRAIN_DATASET_PATH) if f.is_dir()]
+
+def pathListIntoIds(dirList):
+    x = []
+    for i in range(0,len(dirList)):
+        x.append(dirList[i][dirList[i].rfind('/')+1:])
+    return x
+
+train_and_test_ids = pathListIntoIds(train_and_val_directories); 
+
+    
+train_test_ids, val_ids = train_test_split(train_and_test_ids,test_size=0.2) 
+train_ids, test_ids = train_test_split(train_test_ids,test_size=0.15)
+
+
+keras = tf.compat.v1.keras
+Sequence = keras.utils.Sequence
+
+class DataGenerator(Sequence):
+    'Generates data for Keras'
+    def __init__(self, list_IDs, dim=(IMG_SIZE,IMG_SIZE), batch_size = 1, n_channels = 2, shuffle=True):
+        'Initialization'
+        self.dim = dim
+        self.batch_size = batch_size
+        self.list_IDs = list_IDs
+        self.n_channels = n_channels
+        self.shuffle = shuffle
+        self.on_epoch_end()
+
+    def __len__(self):
+        'Denotes the number of batches per epoch'
+        return int(np.floor(len(self.list_IDs) / self.batch_size))
+
+    def __getitem__(self, index):
+        'Generate one batch of data'
+        # Generate indexes of the batch
+        indexes = self.indexes[index*self.batch_size:(index+1)*self.batch_size]
+        # Find list of IDs
+        Batch_ids = [self.list_IDs[k] for k in indexes]
+
+        # Generate data
+        X, y = self.__data_generation(Batch_ids)
+
+        return X, y
+
+    def on_epoch_end(self):
+        'Updates indexes after each epoch'
+        self.indexes = np.arange(len(self.list_IDs))
+        if self.shuffle == True:
+            np.random.shuffle(self.indexes)
+
+    def __data_generation(self, Batch_ids):
+        'Generates data containing batch_size samples' # X : (n_samples, *dim, n_channels)
+        # Initialization
+        X = np.zeros((self.batch_size*SLICES, *self.dim, self.n_channels))
+        y = np.zeros((self.batch_size*SLICES, IMG_SIZE, IMG_SIZE))
+        Y = np.zeros((self.batch_size*SLICES, *self.dim, 4))
+
+        
+        # Generate data
+        for c, i in enumerate(Batch_ids):
+            case_path = os.path.join(TRAIN_DATASET_PATH, i)
+
+            data_path = os.path.join(case_path, f'{i}_flair.nii.gz');
+            flair = nib.load(data_path).get_fdata()    
+
+            data_path = os.path.join(case_path, f'{i}_t1ce.nii.gz');
+            ce = nib.load(data_path).get_fdata()
+            
+            data_path = os.path.join(case_path, f'{i}_seg.nii.gz');
+            seg = nib.load(data_path).get_fdata()
+        
+            for j in range(SLICES):
+             X[j+(SLICES*c),:,:,0] = cv2.resize(flair[:,:,j+0], (IMG_SIZE, IMG_SIZE))
+
+             X[j+(SLICES*c),:,:,1] = cv2.resize(ce[:,:,j+0], (IMG_SIZE, IMG_SIZE))
+             
+             
+             y[j +SLICES*c,:,:] = cv2.resize(seg[:,:,j+0], (IMG_SIZE, IMG_SIZE))
+
+        X = X.reshape(1,128,128,128,2)
+        y = y.reshape(1,128,128,128)
+        # Generate masks
+        y[y==4] = 3;
+        y = tf.one_hot(y, 4);
+        #Y = tf.image.resize(mask, (IMG_SIZE, IMG_SIZE));
+        #Y = np.array(Y).reshape(1,128,128,128)
+        return X/np.max(X), y
+        
+training_generator = DataGenerator(train_ids)
+valid_generator = DataGenerator(val_ids)
+test_generator = DataGenerator(test_ids)
+
+
+
+
+
+
+
 
 def unet_3d_conv(layer, filters):
     layer = Conv3D(filters, kernel_size=(3,3,3), strides=(1,1,1), padding='same')(layer)
@@ -210,6 +291,7 @@ input_layer = Input((SLICES, IMG_SIZE, IMG_SIZE, BATCH_SIZE))
 model = unet_3d(input_layer) 
 model.compile(loss="categorical_crossentropy", optimizer=Adam(learning_rate=0.001), metrics = ['accuracy',tf.keras.metrics.MeanIoU(num_classes=4), dice_coef, precision, sensitivity, specificity, dice_coef_necrotic, dice_coef_edema ,dice_coef_enhancing] )
 model.summary()
+model.fit(training_generator, epochs=5, steps_per_epoch=len(train_ids)/5, validation_data=valid_generator, use_multiprocessing=True)
 
 
 
