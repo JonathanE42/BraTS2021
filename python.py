@@ -81,7 +81,7 @@ for i in range(1, 12+1):
 def dice_coef(y_true, y_pred, epsilon=0.00001):
     """
     Dice = (2*|X & Y|)/ (|X|+ |Y|)
-         =  2*sum(|A*B|)/(sum(A^2)+sum(B^2))
+        =  2*sum(|A*B|)/(sum(A^2)+sum(B^2))
     ref: https://arxiv.org/pdf/1606.04797v1.pdf
     
     """
@@ -91,7 +91,7 @@ def dice_coef(y_true, y_pred, epsilon=0.00001):
     return K.mean((dice_numerator)/(dice_denominator))
 
 
- 
+
 # define per class evaluation of dice coef
 # inspired by https://github.com/keras-team/keras/issues/9395
 def dice_coef_necrotic(y_true, y_pred, epsilon=1e-6):
@@ -130,8 +130,9 @@ def specificity(y_true, y_pred):
     return true_negatives / (possible_negatives + K.epsilon())
 
 
-IMG_SIZE=image_data.shape[0] # 240
-SLICES=image_data.shape[2]-3 # 155 (minus 3 = 152 s.t. we can divide by 2 three times)
+IMG_SIZE=64 # 240
+SLICES=16 # 155 minus 3 = 152 (s.t. we can divide by 2 three times)
+SLICES_START=22
 BATCH_SIZE=1
 
 TRAIN_DATASET_PATH = './training-data/'
@@ -215,15 +216,15 @@ class DataGenerator(Sequence):
             seg = nib.load(data_path).get_fdata()
         
             for j in range(SLICES):
-             X[j+(SLICES*c),:,:,0] = cv2.resize(flair[:,:,j+0], (IMG_SIZE, IMG_SIZE))
+                X[j+(SLICES*c),:,:,0] = cv2.resize(flair[:,:,j+SLICES_START], (IMG_SIZE, IMG_SIZE))
 
-             X[j+(SLICES*c),:,:,1] = cv2.resize(ce[:,:,j+0], (IMG_SIZE, IMG_SIZE))
-             
-             
-             y[j +SLICES*c,:,:] = cv2.resize(seg[:,:,j+0], (IMG_SIZE, IMG_SIZE))
+                X[j+(SLICES*c),:,:,1] = cv2.resize(ce[:,:,j+SLICES_START], (IMG_SIZE, IMG_SIZE))
+                
+                
+                y[j +SLICES*c,:,:] = cv2.resize(seg[:,:,j+SLICES_START], (IMG_SIZE, IMG_SIZE))
 
-        X = X.reshape(1,128,128,128,2)
-        y = y.reshape(1,128,128,128)
+        X = X.reshape(1,SLICES,IMG_SIZE,IMG_SIZE,2)
+        y = y.reshape(1,SLICES,IMG_SIZE,IMG_SIZE)
         # Generate masks
         y[y==4] = 3;
         y = tf.one_hot(y, 4);
@@ -287,19 +288,11 @@ def unet_3d(input_img):
     return model 
 
 
-input_layer = Input((SLICES, IMG_SIZE, IMG_SIZE, BATCH_SIZE))
+input_layer = Input((SLICES, IMG_SIZE, IMG_SIZE, 2))
 model = unet_3d(input_layer) 
 model.compile(loss="categorical_crossentropy", optimizer=Adam(learning_rate=0.001), metrics = ['accuracy',tf.keras.metrics.MeanIoU(num_classes=4), dice_coef, precision, sensitivity, specificity, dice_coef_necrotic, dice_coef_edema ,dice_coef_enhancing] )
 model.summary()
-model.fit(training_generator, epochs=5, steps_per_epoch=len(train_ids)/5, validation_data=valid_generator, use_multiprocessing=True)
-
-
-
-
-
-
-
-
+model.fit(training_generator, epochs=5, steps_per_epoch=len(train_ids)/5, validation_data=valid_generator, use_multiprocessing=False)
 
 
 
