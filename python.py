@@ -131,7 +131,7 @@ def specificity(y_true, y_pred):
 
 
 IMG_SIZE=64 # 240
-SLICES=16 # 155 minus 3 = 152 (s.t. we can divide by 2 three times)
+SLICES=32 # 155 minus 3 = 152 (s.t. we can divide by 2 three times)
 SLICES_START=22
 BATCH_SIZE=1
 
@@ -163,7 +163,7 @@ Sequence = keras.utils.Sequence
 
 class DataGenerator(Sequence):
     'Generates data for Keras'
-    def __init__(self, list_IDs, dim=(IMG_SIZE,IMG_SIZE), batch_size = 1, n_channels = 2, shuffle=True):
+    def __init__(self, list_IDs, dim=(IMG_SIZE,IMG_SIZE), batch_size = BATCH_SIZE, n_channels = 2, shuffle=True):
         'Initialization'
         self.dim = dim
         self.batch_size = batch_size
@@ -290,45 +290,6 @@ def unet_3d(input_img):
 
 input_layer = Input((SLICES, IMG_SIZE, IMG_SIZE, 2))
 model = unet_3d(input_layer) 
-model.compile(loss="categorical_crossentropy", optimizer=Adam(learning_rate=0.001), metrics = ['accuracy',tf.keras.metrics.MeanIoU(num_classes=4), dice_coef, precision, sensitivity, specificity, dice_coef_necrotic, dice_coef_edema ,dice_coef_enhancing] )
+model.compile(optimizer=keras.optimizers.SGD(learning_rate=0.01), loss="categorical_crossentropy", metrics = ['accuracy',tf.keras.metrics.MeanIoU(num_classes=4), dice_coef, precision, sensitivity, specificity, dice_coef_necrotic, dice_coef_edema ,dice_coef_enhancing] )
 model.summary()
-model.fit(training_generator, epochs=5, steps_per_epoch=len(train_ids)/5, validation_data=valid_generator, use_multiprocessing=False)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+model.fit(training_generator, epochs=1, steps_per_epoch=len(train_ids)/1, validation_data=valid_generator, workers = 3)
