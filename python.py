@@ -26,8 +26,6 @@ from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, EarlyStopping, T
 from tensorflow.keras.layers.experimental import preprocessing
 import cv2
 
-print("\n"*5)
-
 #
 #image_path = "./training-data/BraTS2021_00284/BraTS2021_00284_t1.nii.gz"
 #mask_path = "./training-data/BraTS2021_00284/BraTS2021_00284_seg.nii.gz"
@@ -70,7 +68,7 @@ print("\n"*5)
 
 
 
-
+# np.seterr(divide='ignore', invalid='ignore')
 
 
 
@@ -132,8 +130,8 @@ def specificity(y_true, y_pred):
     return true_negatives / (possible_negatives + K.epsilon())
 
 
-IMG_SIZE=64 # 240
-SLICES=32 # 155 minus 3 = 152 (s.t. we can divide by 2 three times)
+IMG_SIZE=120 # 240
+SLICES=16 # 155 minus 3 = 152 (s.t. we can divide by 2 three times)
 SLICES_START=22
 BATCH_SIZE=1
 
@@ -157,7 +155,7 @@ train_and_test_ids = pathListIntoIds(train_and_val_directories);
 
     
 train_test_ids, val_ids = train_test_split(train_and_test_ids,test_size=0.2) 
-train_ids, test_ids = train_test_split(train_test_ids,test_size=0.15)
+train_ids, test_ids = train_test_split(train_test_ids,test_size=0.2)
 
 
 keras = tf.compat.v1.keras
@@ -217,7 +215,7 @@ class DataGenerator(Sequence):
             data_path = os.path.join(case_path, f'{i}_seg.nii.gz');
             seg = nib.load(data_path).get_fdata()
         
-            for j in range(SLICES):
+            for j in range(SLICES//2):
                 X[j+(SLICES*c),:,:,0] = cv2.resize(flair[:,:,j+SLICES_START], (IMG_SIZE, IMG_SIZE))
 
                 X[j+(SLICES*c),:,:,1] = cv2.resize(ce[:,:,j+SLICES_START], (IMG_SIZE, IMG_SIZE))
@@ -237,6 +235,15 @@ class DataGenerator(Sequence):
 training_generator = DataGenerator(train_ids)
 valid_generator = DataGenerator(val_ids)
 test_generator = DataGenerator(test_ids)
+
+
+
+# Use these in our improved model?
+#callbacks = [keras.callbacks.EarlyStopping(monitor='loss', min_delta=0,
+#                               patience=2, verbose=1, mode='auto'),
+#      keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2,
+#                              patience=2, min_lr=0.000001, verbose=1),
+#    ]
 
 
 
@@ -294,4 +301,4 @@ input_layer = Input((SLICES, IMG_SIZE, IMG_SIZE, 2))
 model = unet_3d(input_layer) 
 model.compile(optimizer=keras.optimizers.SGD(learning_rate=0.01), loss="categorical_crossentropy", metrics = ['accuracy',tf.keras.metrics.MeanIoU(num_classes=4), dice_coef, precision, sensitivity, specificity, dice_coef_necrotic, dice_coef_edema ,dice_coef_enhancing] )
 model.summary()
-model.fit(training_generator, epochs=1, steps_per_epoch=len(train_ids)/1, validation_data=valid_generator, workers = 3)
+model.fit(training_generator, steps_per_epoch=len(train_ids)/1, epochs=3, validation_data=valid_generator)
