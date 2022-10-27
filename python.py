@@ -28,39 +28,41 @@ import cv2
 
 print("\n"*5)
 
-image_path = "./training-data/BraTS2021_00284/BraTS2021_00284_t1.nii.gz"
-mask_path = "./training-data/BraTS2021_00284/BraTS2021_00284_seg.nii.gz"
+#
+#image_path = "./training-data/BraTS2021_00284/BraTS2021_00284_t1.nii.gz"
+#mask_path = "./training-data/BraTS2021_00284/BraTS2021_00284_seg.nii.gz"
 
-image_obj = nib.load(image_path)
-mask_obj = nib.load(mask_path)
+#image_obj = nib.load(image_path)
+#mask_obj = nib.load(mask_path)
 
-image_data = image_obj.get_fdata()
-mask_data = mask_obj.get_fdata()
+#image_data = image_obj.get_fdata()
+#mask_data = mask_obj.get_fdata()
 
-def visualize_3d(layer):
-    return layer
+#def visualize_3d(layer):
+#    return layer
 
-def visualize_3d_labels(layer):
-    return layer
+#def visualize_3d_labels(layer):
+#    return layer
 
 #plt.imshow(mask_data[:, :, 100])
 #plt.imshow(image_data[:, :, 100], cmap='gray')
 #plt.imshow(image_data[:, :, 105], cmap='gray')
-w = 10
-h = 10
-fig = plt.figure(figsize=(8, 8))
-columns = 4
-rows = 6 
-for i in range(1, 12+1):
-    img = image_data[:, :, 100+i]
-    fig.add_subplot(rows, columns, i)
-    plt.imshow(img, cmap='gray')
-for i in range(1, 12+1):
-    img = mask_data[:, :, 100+i]
-    fig.add_subplot(rows, columns, i+12)
-    plt.imshow(img)
+#w = 10
+#h = 10
+#fig = plt.figure(figsize=(8, 8))
+#columns = 4
+#rows = 6 
+#for i in range(1, 12+1):
+#    img = image_data[:, :, 100+i]
+#    fig.add_subplot(rows, columns, i)
+#    plt.imshow(img, cmap='gray')
+#for i in range(1, 12+1):
+#    img = mask_data[:, :, 100+i]
+#    fig.add_subplot(rows, columns, i+12)
+#    plt.imshow(img)
 
 #plt.show()
+###
 
 
 
