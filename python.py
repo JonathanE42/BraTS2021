@@ -25,6 +25,9 @@ from keras.optimizers import *
 from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, EarlyStopping, TensorBoard
 from tensorflow.keras.layers.experimental import preprocessing
 import cv2
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 #
 #image_path = "./training-data/BraTS2021_00284/BraTS2021_00284_t1.nii.gz"
@@ -135,7 +138,7 @@ SLICES=16 # 155 minus 3 = 152 (s.t. we can divide by 2 three times)
 SLICES_START=22
 BATCH_SIZE=1
 
-TRAIN_DATASET_PATH = './training-data/'
+TRAIN_DATASET_PATH = os.getenv('TRAIN-PATH')
 
 #file = tarfile.open('./BraTS2021_00621.tar')
 #file.extractall('./val-data')
