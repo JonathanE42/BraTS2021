@@ -3,8 +3,6 @@
 import tarfile
 import numpy as np
 import nibabel as nib                                                     
-import itk                                                                
-import itkwidgets
 from ipywidgets import interact, interactive, IntSlider, ToggleButtons
 import matplotlib.pyplot as plt
 from skimage.util import montage 
