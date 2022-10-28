@@ -131,9 +131,9 @@ def specificity(y_true, y_pred):
     return true_negatives / (possible_negatives + K.epsilon())
 
 
-IMG_SIZE=120 # 240
-SLICES=16 # 155 minus 3 = 152 (s.t. we can divide by 2 three times)
-SLICES_START=22
+IMG_SIZE=240 # 240
+SLICES=8 # 155 minus 3 = 152 (s.t. we can divide by 2 three times)
+SLICES_START=1
 BATCH_SIZE=1
 
 TRAIN_DATASET_PATH = os.getenv('TRAIN-PATH')
@@ -231,6 +231,11 @@ class DataGenerator(Sequence):
         y = tf.one_hot(y, 4);
         #Y = tf.image.resize(mask, (IMG_SIZE, IMG_SIZE));
         #Y = np.array(Y).reshape(1,128,128,128)
+
+        # Avoid dividing by zero - return early
+        if np.max(X) == 0.0:
+          return np.zeros(X.shape), y
+
         return X/np.max(X), y
         
 training_generator = DataGenerator(train_ids)
