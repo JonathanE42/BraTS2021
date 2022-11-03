@@ -128,7 +128,7 @@ def specificity(y_true, y_pred):
 
 
 IMG_SIZE=120 # 240
-SLICES=100 # 155 minus 3 = 152 (s.t. we can divide by 2 three times)
+SLICES=112 # 155 minus 3 = 152 (s.t. we can divide by 2 three times)
 SLICES_START=20
 BATCH_SIZE=1
 
