@@ -91,6 +91,7 @@ IMG_SIZE=128 # 240
 SLICES=128 # 155 minus 3 = 152 (s.t. we can divide by 2 three times)
 SLICES_START=20
 BATCH_SIZE=1
+CHANNELS=4
 
 
 TRAIN_DATASET_PATH = os.getenv('TRAIN-PATH')
@@ -117,7 +118,7 @@ Sequence = keras.utils.Sequence
 
 class DataGenerator(Sequence):
     'Generates data for Keras'
-    def __init__(self, list_IDs, dim=(IMG_SIZE,IMG_SIZE), batch_size = BATCH_SIZE, n_channels = 4, shuffle=True):
+    def __init__(self, list_IDs, dim=(IMG_SIZE,IMG_SIZE), batch_size = BATCH_SIZE, n_channels = CHANNELS, shuffle=True):
         'Initialization'
         self.dim = dim
         self.batch_size = batch_size
@@ -182,7 +183,7 @@ class DataGenerator(Sequence):
                 
                 y[j +SLICES*c,:,:] = cv2.resize(seg[:,:,j+SLICES_START], (IMG_SIZE, IMG_SIZE))
 
-        X = X.reshape(1,SLICES,IMG_SIZE,IMG_SIZE, 4)
+        X = X.reshape(1,SLICES,IMG_SIZE,IMG_SIZE, CHANNELS)
         y = y.reshape(1,SLICES,IMG_SIZE,IMG_SIZE)
         # Generate masks
         #y[y==4] = 3;
@@ -222,49 +223,37 @@ def unet_3d_conv(layer, filters):
 
 
 def unet_3d(input_img):
-    #c1 = unet_3d_conv(input_img, 32)
     c1 = unet_3d_conv(input_img, 8)
-    #c2 = unet_3d_conv(c1, 64)
     c2 = unet_3d_conv(c1, 16)
-    #c3 = MaxPooling3D(pool_size=(2,2,2), strides=(2,2,2))(c2)
-    c3 = Conv3D(1, kernel_size=(2, 2, 2), strides=(2, 2, 2), padding='same')(c2)
+    
+    # Maybe use Convolution with stride = 2 in improved model
+    c3 = MaxPooling3D(pool_size=(2,2,2), strides=(2,2,2))(c2)
+    
 
-    #c4 = unet_3d_conv(c3, 64)
     c4 = unet_3d_conv(c3, 16)
-    #c5 = unet_3d_conv(c4, 128)
     c5 = unet_3d_conv(c4, 32)
     c6 = MaxPooling3D(pool_size=(2,2,2), strides=(2,2,2))(c5)
 
-    #c7 = unet_3d_conv(c6, 128)
     c7 = unet_3d_conv(c6, 32)
-    #c8 = unet_3d_conv(c7, 256)
     c8 = unet_3d_conv(c7, 64)
     c9 = MaxPooling3D(pool_size=(2,2,2), strides=(2,2,2))(c8)
 
-    #c10 = unet_3d_conv(c9, 256)
     c10 = unet_3d_conv(c9, 64)
-    #c11 = unet_3d_conv(c10, 512)
     c11 = unet_3d_conv(c10, 128)
     c12 = UpSampling3D(2)(c11)
 
     c13 = concatenate([c8, c12])
-    #c14 = unet_3d_conv(c13, 256)
     c14 = unet_3d_conv(c13, 64)
-    #c15 = unet_3d_conv(c14, 256)
     c15 = unet_3d_conv(c14, 64)
     c16 = UpSampling3D(2)(c15)
 
     c17 = concatenate([c5, c16])
-    #c18 = unet_3d_conv(c17, 128)
     c18 = unet_3d_conv(c17, 32)
-   # c19 = unet_3d_conv(c18, 128)
     c19 = unet_3d_conv(c18, 32)
     c20 = UpSampling3D(2)(c19)
 
     c21 = concatenate([c2, c20])
-    #c22 = unet_3d_conv(c21, 64)
     c22 = unet_3d_conv(c21, 16)
-    #c23 = unet_3d_conv(c22, 64)
     c23 = unet_3d_conv(c22, 16)
     c24 = Conv3D(4, kernel_size=(1,1,1), strides=(1,1,1), padding='same')(c23)
     c25 = Activation('softmax')(c24)
@@ -274,7 +263,7 @@ def unet_3d(input_img):
     return model 
 
 
-input_layer = Input((SLICES, IMG_SIZE, IMG_SIZE, 4))
+input_layer = Input((SLICES, IMG_SIZE, IMG_SIZE, CHANNELS))
 model = unet_3d(input_layer) 
 
 
