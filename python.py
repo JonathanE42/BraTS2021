@@ -27,48 +27,6 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
-#
-#image_path = "./training-data/BraTS2021_00284/BraTS2021_00284_t1.nii.gz"
-#mask_path = "./training-data/BraTS2021_00284/BraTS2021_00284_seg.nii.gz"
-
-#image_obj = nib.load(image_path)
-#mask_obj = nib.load(mask_path)
-
-#image_data = image_obj.get_fdata()
-#mask_data = mask_obj.get_fdata()
-
-#def visualize_3d(layer):
-#    return layer
-
-#def visualize_3d_labels(layer):
-#    return layer
-
-#plt.imshow(mask_data[:, :, 100])
-#plt.imshow(image_data[:, :, 100], cmap='gray')
-#plt.imshow(image_data[:, :, 105], cmap='gray')
-#w = 10
-#h = 10
-#fig = plt.figure(figsize=(8, 8))
-#columns = 4
-#rows = 6 
-#for i in range(1, 12+1):
-#    img = image_data[:, :, 100+i]
-#    fig.add_subplot(rows, columns, i)
-#    plt.imshow(img, cmap='gray')
-#for i in range(1, 12+1):
-#    img = mask_data[:, :, 100+i]
-#    fig.add_subplot(rows, columns, i+12)
-#    plt.imshow(img)
-
-#plt.show()
-###
-
-
-
-
-
-
-
 #### Borrowed a little from: https://www.kaggle.com/code/malik12345/brain-tumor-detection-using-cnn-model/notebook
 
 
@@ -127,16 +85,12 @@ def specificity(y_true, y_pred):
     return true_negatives / (possible_negatives + K.epsilon())
 
 
-IMG_SIZE=120 # 240
-SLICES=100 # 155 minus 3 = 152 (s.t. we can divide by 2 three times)
+IMG_SIZE=128 # 240
+SLICES=128 # 155 minus 3 = 152 (s.t. we can divide by 2 three times)
 SLICES_START=20
 BATCH_SIZE=1
 
 TRAIN_DATASET_PATH = os.getenv('TRAIN-PATH')
-
-#file = tarfile.open('./BraTS2021_00621.tar')
-#file.extractall('./val-data')
-#file.close()
 
 
 import os
@@ -160,7 +114,7 @@ Sequence = keras.utils.Sequence
 
 class DataGenerator(Sequence):
     'Generates data for Keras'
-    def __init__(self, list_IDs, dim=(IMG_SIZE,IMG_SIZE), batch_size = BATCH_SIZE, n_channels = 1, shuffle=True):
+    def __init__(self, list_IDs, dim=(IMG_SIZE,IMG_SIZE), batch_size = BATCH_SIZE, n_channels = 4, shuffle=True):
         'Initialization'
         self.dim = dim
         self.batch_size = batch_size
@@ -196,7 +150,6 @@ class DataGenerator(Sequence):
         # Initialization
         X = np.zeros((self.batch_size*SLICES, *self.dim, self.n_channels))
         y = np.zeros((self.batch_size*SLICES, IMG_SIZE, IMG_SIZE))
-        Y = np.zeros((self.batch_size*SLICES, *self.dim, 4))
 
         
         # Generate data
@@ -204,30 +157,33 @@ class DataGenerator(Sequence):
             case_path = os.path.join(TRAIN_DATASET_PATH, i)
 
             data_path = os.path.join(case_path, f'{i}_flair.nii.gz');
-            flair = nib.load(data_path).get_fdata()    
+            flair = nib.load(data_path).get_fdata()
+            
+            data_path = os.path.join(case_path, f'{i}_t1ce.nii.gz');
+            ce = nib.load(data_path).get_fdata()   
+            
+            data_path = os.path.join(case_path, f'{i}_t1.nii.gz');
+            t1 = nib.load(data_path).get_fdata()       
 
-            #data_path = os.path.join(case_path, f'{i}_t1ce.nii.gz');
-            #ce = nib.load(data_path).get_fdata()
+            data_path = os.path.join(case_path, f'{i}_t2.nii.gz');
+            t2 = nib.load(data_path).get_fdata()
             
             data_path = os.path.join(case_path, f'{i}_seg.nii.gz');
             seg = nib.load(data_path).get_fdata()
         
             for j in range(SLICES):
                 X[j+(SLICES*c),:,:,0] = cv2.resize(flair[:,:,j+SLICES_START], (IMG_SIZE, IMG_SIZE))
-
-                #X[j+(SLICES*c),:,:,1] = cv2.resize(ce[:,:,j+SLICES_START], (IMG_SIZE, IMG_SIZE))
-                
+                X[j+(SLICES*c),:,:,1] = cv2.resize(ce[:,:,j+SLICES_START], (IMG_SIZE, IMG_SIZE))
+                X[j+(SLICES*c),:,:,2] = cv2.resize(t1[:,:,j+SLICES_START], (IMG_SIZE, IMG_SIZE))
+                X[j+(SLICES*c),:,:,3] = cv2.resize(t2[:,:,j+SLICES_START], (IMG_SIZE, IMG_SIZE))                
                 
                 y[j +SLICES*c,:,:] = cv2.resize(seg[:,:,j+SLICES_START], (IMG_SIZE, IMG_SIZE))
 
-        #X = X.reshape(1,SLICES,IMG_SIZE,IMG_SIZE,2)
-        X = X.reshape(1,SLICES,IMG_SIZE,IMG_SIZE)
+        X = X.reshape(1,SLICES,IMG_SIZE,IMG_SIZE, 4)
         y = y.reshape(1,SLICES,IMG_SIZE,IMG_SIZE)
         # Generate masks
-        y[y==4] = 3;
+        #y[y==4] = 3;
         y = tf.one_hot(y, 4);
-        #Y = tf.image.resize(mask, (IMG_SIZE, IMG_SIZE));
-        #Y = np.array(Y).reshape(1,128,128,128)
 
         # Avoid dividing by zero - return early
         if np.max(X) == 0.0:
@@ -267,7 +223,8 @@ def unet_3d(input_img):
     c1 = unet_3d_conv(input_img, 8)
     #c2 = unet_3d_conv(c1, 64)
     c2 = unet_3d_conv(c1, 16)
-    c3 = MaxPooling3D(pool_size=(2,2,2), strides=(2,2,2))(c2)
+    #c3 = MaxPooling3D(pool_size=(2,2,2), strides=(2,2,2))(c2)
+    c3 = Conv3D(1, kernel_size=(2, 2, 2), strides=(2, 2, 2), padding='same')(c2)
 
     #c4 = unet_3d_conv(c3, 64)
     c4 = unet_3d_conv(c3, 16)
@@ -314,7 +271,7 @@ def unet_3d(input_img):
     return model 
 
 
-input_layer = Input((SLICES, IMG_SIZE, IMG_SIZE, 1))
+input_layer = Input((SLICES, IMG_SIZE, IMG_SIZE, 4))
 model = unet_3d(input_layer) 
 model.compile(optimizer=keras.optimizers.SGD(learning_rate=0.01), loss="categorical_crossentropy", metrics = ['accuracy',tf.keras.metrics.MeanIoU(num_classes=4), dice_coef, precision, sensitivity, specificity, dice_coef_necrotic, dice_coef_edema ,dice_coef_enhancing] )
 model.summary()
