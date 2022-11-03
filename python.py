@@ -25,6 +25,8 @@ from tensorflow.keras.layers.experimental import preprocessing
 import cv2
 import os
 from dotenv import load_dotenv
+import wandb
+from wandb.keras import WandbCallback
 load_dotenv()
 
 #
@@ -62,8 +64,6 @@ load_dotenv()
 
 #plt.show()
 ###
-
-
 
 
 
@@ -131,6 +131,7 @@ IMG_SIZE=120 # 240
 SLICES=112 # 155 minus 3 = 152 (s.t. we can divide by 2 three times)
 SLICES_START=20
 BATCH_SIZE=1
+
 
 TRAIN_DATASET_PATH = os.getenv('TRAIN-PATH')
 
@@ -316,6 +317,20 @@ def unet_3d(input_img):
 
 input_layer = Input((SLICES, IMG_SIZE, IMG_SIZE, 1))
 model = unet_3d(input_layer) 
-model.compile(optimizer=keras.optimizers.SGD(learning_rate=0.01), loss="categorical_crossentropy", metrics = ['accuracy',tf.keras.metrics.MeanIoU(num_classes=4), dice_coef, precision, sensitivity, specificity, dice_coef_necrotic, dice_coef_edema ,dice_coef_enhancing] )
+
+
+LR = 0.01
+EPOCHS = 3
+
+wandb.init(project="BraTS2021", entity="je42")
+wandb.config = {
+  "learning_rate": LR,
+  "epochs": EPOCHS,
+  "batch_size": BATCH_SIZE,
+  "img_size": IMG_SIZE, 
+  "slices": SLICES
+}
+
+model.compile(optimizer=keras.optimizers.SGD(learning_rate=LR), loss="categorical_crossentropy", metrics = ['accuracy',tf.keras.metrics.MeanIoU(num_classes=4), dice_coef, precision, sensitivity, specificity, dice_coef_necrotic, dice_coef_edema ,dice_coef_enhancing] )
 model.summary()
-model.fit(training_generator, epochs=3, validation_data=valid_generator)
+model.fit(training_generator, epochs=EPOCHS, validation_data=valid_generator, callbacks=[WandbCallback()])
