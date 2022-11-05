@@ -2,8 +2,7 @@
 
 import tarfile
 import numpy as np
-import nibabel as nib                                                     
-from ipywidgets import interact, interactive, IntSlider, ToggleButtons
+import nibabel as nib
 import matplotlib.pyplot as plt
 from skimage.util import montage 
 from skimage.transform import rotate
@@ -267,10 +266,10 @@ input_layer = Input((SLICES, IMG_SIZE, IMG_SIZE, CHANNELS))
 model = unet_3d(input_layer) 
 
 
-LR = 0.01
+LR = 0.001
 EPOCHS = 3
 
-wandb.init(project="BraTS2021", entity="je42")
+wandb.init(project="BraTS2021", entity="vj-dl")
 wandb.config = {
   "learning_rate": LR,
   "epochs": EPOCHS,
